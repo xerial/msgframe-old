@@ -1,8 +1,9 @@
 organization := "org.xerial.msgframe"
+sonatypeProfileName := "org.xerial"
 description := "MessagePack based DataFrame for Scala"
 scalaVersion in Global := "2.11.7"
 
-lazy val core = Project(id = "msgframe-core", base = file(".")).settings(
+lazy val core = Project(id = "msgframe-core", base = file("msgframe-core")).settings(
     libraryDependencies ++= Seq(
       "org.msgpack" % "msgpack-core" % "0.7.0-M6",
       "org.scalatest" %% "scalatest" % "2.2.4" % "test"
@@ -34,3 +35,20 @@ pomExtra in Global := {
       </developer>
     </developers>
 }
+
+import ReleaseTransformations._
+
+releaseProcess := Seq[ReleaseStep](
+  checkSnapshotDependencies,
+  inquireVersions,
+  runClean,
+  runTest,
+  setReleaseVersion,
+  commitReleaseVersion,
+  tagRelease,
+  ReleaseStep(action = Command.process("publishSigned", _)),
+  setNextVersion,
+  commitNextVersion,
+  ReleaseStep(action = Command.process("sonatypeReleaseAll", _)),
+  pushChanges
+)
