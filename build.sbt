@@ -6,9 +6,11 @@ scalaVersion in Global := "2.11.7"
 lazy val core = Project(id = "msgframe-core", base = file("msgframe-core")).settings(
     libraryDependencies ++= Seq(
       "org.msgpack" % "msgpack-core" % "0.7.0-M6",
+      "joda-time" % "joda-time" % "2.8.2",
       "org.scalatest" %% "scalatest" % "2.2.4" % "test"
     )
 )
+
 
 pomExtra in Global := {
     <url>http://xerial.org/msgframe</url>
