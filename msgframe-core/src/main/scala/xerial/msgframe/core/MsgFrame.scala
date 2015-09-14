@@ -130,9 +130,9 @@ object MsgFrame {
     val rows = Seq.newBuilder[Any]
     val buf = new ByteArrayOutputStream()
     val packer = MessagePack.newDefaultPacker(buf)
-    val rowIndexes = Seq.newBuilder[Long]
+    val rowIndexes = Seq.newBuilder[Int]
     while (rs.next()) {
-      rowIndexes += packer.getTotalWrittenBytes
+      rowIndexes += packer.getTotalWrittenBytes.toInt
       packer.packArrayHeader(numColumns)
       for (i <- (0 until numColumns)) {
         colMapper(i).pack(rs, i + 1, packer)
@@ -199,21 +199,45 @@ object MsgFrame {
   )
 }
 
+import xerial.msgframe.core.MsgFrame._
+
 /**
  *
  */
 trait MsgFrame {
   def cols: Seq[String]
-  def colTypes: Seq[Class[_]]
+  def colTypes: Seq[MessageType]
 
+  def numRows : Int
+  def numColumns : Int
 }
 
-import xerial.msgframe.core.MsgFrame.MessageType
-
-class RawOrientedFrame(val cols: Seq[String], val colTypes: Seq[MessageType], val data: Array[Byte], val rowOffsets: Array[Long])
+class RawOrientedFrame(val cols: Seq[String], val colTypes: Seq[MessageType], val data: Array[Byte], val rowOffsets: Array[Int])
   extends MsgFrame {
 
+  def numRows = rowOffsets.length
+  def numColumns = cols.length
 
+  override def toString() = {
+    val s = new StringBuilder
+    for(row <- 0 until numRows) {
+      if(row > 0) {
+        s.append("\n")
+      }
+      val begin = rowOffsets(row)
+      val end = if(row < numRows - 1) rowOffsets(row+1) else data.length
+      val unpacker = MessagePack.newDefaultUnpacker(data, begin, end - begin)
+      val numCols = unpacker.unpackArrayHeader()
+      val cols = for(col <- 0 until numCols) yield {
+        val v = unpacker.unpackValue()
+        v.toString
+      }
+      s.append(cols.mkString("\t"))
+    }
+    s.result()
+  }
 }
+
+
 
 

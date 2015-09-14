@@ -5,9 +5,11 @@ scalaVersion in Global := "2.11.7"
 
 lazy val core = Project(id = "msgframe-core", base = file("msgframe-core")).settings(
     libraryDependencies ++= Seq(
+      "org.xerial" % "xerial-core" % "3.3.8",
       "org.msgpack" % "msgpack-core" % "0.7.0-M6",
       "joda-time" % "joda-time" % "2.8.2",
-      "org.scalatest" %% "scalatest" % "2.2.4" % "test"
+      "org.scalatest" %% "scalatest" % "2.2.4" % "test",
+      "org.xerial" % "sqlite-jdbc" % "3.8.11"
     )
 )
 
