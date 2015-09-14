@@ -18,7 +18,7 @@ lazy val core = Project(id = "msgframe-core", base = file("msgframe-core"))
     libraryDependencies ++= Seq(
       "org.xerial" % "xerial-core" % "3.3.8",
       "org.msgpack" % "msgpack-core" % "0.7.0-M6",
-      "joda-time" % "joda-time" % "2.8.2",
+      "com.github.nscala-time" %% "nscala-time" % "2.2.0",
       "org.scalatest" %% "scalatest" % "2.2.4" % "test",
       "org.xerial" % "sqlite-jdbc" % "3.8.11"
     )

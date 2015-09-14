@@ -151,23 +151,14 @@ object MsgFrame {
   sealed trait MessageType
 
   object MessageType {
-
     object STRING extends MessageType
-
     object LONG extends MessageType
-
     object DOUBLE extends MessageType
-
     object BOOLEAN extends MessageType
-
     object BYTE_ARRAY extends MessageType
-
     object TIME extends MessageType
-
     object TIMESTAMP extends MessageType
-
     object UNSUPPORTED extends MessageType
-
   }
 
   import MessageType._
@@ -210,18 +201,18 @@ import xerial.msgframe.core.MsgFrame._
  *
  */
 trait MsgFrame {
-  def cols: Seq[String]
+  def colNames: Seq[String]
   def colTypes: Seq[MessageType]
 
   def numRows : Int
   def numColumns : Int
 }
 
-class RawOrientedFrame(val cols: Seq[String], val colTypes: Seq[MessageType], val data: Array[Byte], val rowOffsets: Array[Int])
+class RawOrientedFrame(val colNames: Seq[String], val colTypes: Seq[MessageType], val data: Array[Byte], val rowOffsets: Array[Int])
   extends MsgFrame {
 
   def numRows = rowOffsets.length
-  def numColumns = cols.length
+  def numColumns = colNames.length
 
   override def toString() = {
     val s = new StringBuilder

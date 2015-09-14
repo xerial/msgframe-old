@@ -48,6 +48,11 @@ class MsgFrameTest extends MsgFrameSpec {
           withResource(st.executeQuery("select * from sample")) { rs =>
             val frame = MsgFrame.fromSQL(rs)
             info(frame)
+
+            frame.numColumns shouldBe 3
+            frame.numRows shouldBe 2
+            frame.colNames shouldBe Seq("id", "name", "date")
+
           }
         }
       }
