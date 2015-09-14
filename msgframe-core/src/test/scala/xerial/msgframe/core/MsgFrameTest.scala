@@ -39,9 +39,9 @@ class MsgFrameTest extends MsgFrameSpec {
     "read data from JDBC results" in {
       withResource(DriverManager.getConnection("jdbc:sqlite::memory:")){ conn =>
         withResource(conn.createStatement()) { st =>
-          st.execute("CREATE TABLE sample (id integer, name string)")
-          st.execute("INSERT INTO sample values(1, 'leo')")
-          st.execute("INSERT INTO sample values(2, 'yui')")
+          st.execute("CREATE TABLE sample (id integer, name string, date date)")
+          st.execute("INSERT INTO sample values(1, 'leo', '2015-01-23')")
+          st.execute("INSERT INTO sample values(2, 'yui', '2015-12-31')")
         }
 
         withResource(conn.createStatement()) { st =>

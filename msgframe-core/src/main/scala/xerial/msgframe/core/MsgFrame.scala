@@ -16,6 +16,7 @@ package xerial.msgframe.core
 import java.io.ByteArrayOutputStream
 import java.sql.ResultSet
 
+import org.joda.time.DateTime
 import org.msgpack.core.{MessagePack, MessagePacker}
 
 
@@ -72,7 +73,11 @@ object MsgFrame {
   }
 
   object DateColMapper extends ColMapper {
-    override def pack(rs: ResultSet, colIndex: Int, packer: MessagePacker) = packer.packLong(rs.getDate(colIndex).getTime)
+    override def pack(rs: ResultSet, colIndex: Int, packer: MessagePacker) = {
+      val dateString = rs.getString(colIndex)
+      val dt = DateTime.parse(dateString)
+      packer.packLong(dt.getMillis)
+    }
   }
 
   object TimeColMapper extends ColMapper {
