@@ -1,9 +1,20 @@
-organization := "org.xerial.msgframe"
-sonatypeProfileName := "org.xerial"
 description := "MessagePack based DataFrame for Scala"
-scalaVersion in Global := "2.11.7"
 
-lazy val core = Project(id = "msgframe-core", base = file("msgframe-core")).settings(
+val commonSettings = Seq(
+  organization := "org.xerial.msgframe",
+  sonatypeProfileName := "org.xerial",
+  scalaVersion := "2.11.7",
+  crossPaths := false
+)
+
+// Do not publish root project
+publish := {}
+publishLocal := {}
+
+lazy val core = Project(id = "msgframe-core", base = file("msgframe-core"))
+  .settings(commonSettings)
+  .settings(
+    description := "MessagePack based DataFrame for Scala",
     libraryDependencies ++= Seq(
       "org.xerial" % "xerial-core" % "3.3.8",
       "org.msgpack" % "msgpack-core" % "0.7.0-M6",
@@ -12,7 +23,6 @@ lazy val core = Project(id = "msgframe-core", base = file("msgframe-core")).sett
       "org.xerial" % "sqlite-jdbc" % "3.8.11"
     )
 )
-
 
 pomExtra in Global := {
     <url>http://xerial.org/msgframe</url>
