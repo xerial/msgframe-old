@@ -100,52 +100,57 @@ object MsgFrame {
   }
 
   def fromSQL(rs: ResultSet) = {
-    val metadata = rs.getMetaData
-    val numColumns = metadata.getColumnCount
-    val colNames = (1 to numColumns).map(i => metadata.getColumnName(i))
-    val colTypes = (1 to numColumns).map(i => metadata.getColumnType(i))
-    val msgTypes : Seq[MessageType] = colTypes.map(jdbcToMessageType.get(_).getOrElse(MessageType.STRING)).toIndexedSeq
-
-    val colMapper: Seq[ColMapper] = (colTypes.map { colType =>
-      colType match {
-        case sql.CHAR | sql.VARCHAR | sql.LONGVARCHAR => StringColMapper
-        case sql.NUMERIC | sql.DECIMAL => BigDecimalColMapper
-        case sql.BIT | sql.BOOLEAN => BooleanColMapper
-        case sql.TINYINT => ByteColMapper
-        case sql.SMALLINT => ShortColMapper
-        case sql.INTEGER => IntColMapper
-        case sql.BIGINT => LongColMapper
-        case sql.REAL => FloatColMapper
-        case sql.FLOAT | sql.DOUBLE => DoubleColMapper
-        case sql.BINARY | sql.VARBINARY | sql.LONGVARBINARY => ByteArrayColMapper
-        case sql.DATE => DateColMapper
-        case sql.TIME => TimeColMapper
-        case sql.TIMESTAMP => TimeStampColMapper
-        case sql.CLOB => ByteArrayColMapper
-        case sql.BLOB => ByteArrayColMapper
-        case sql.DATALINK => UrlColMapper
-        case sql.ARRAY => NullColMapper
-        case sql.DISTINCT => NullColMapper
-        case sql.STRUCT => NullColMapper
-        case sql.REF => NullColMapper
-        case sql.JAVA_OBJECT => NullColMapper
-      }
-    }).toIndexedSeq
-
-    val rows = Seq.newBuilder[Any]
-    val buf = new ByteArrayOutputStream()
-    val packer = MessagePack.newDefaultPacker(buf)
-    val rowIndexes = Seq.newBuilder[Int]
-    while (rs.next()) {
-      rowIndexes += packer.getTotalWrittenBytes.toInt
-      packer.packArrayHeader(numColumns)
-      for (i <- (0 until numColumns)) {
-        colMapper(i).pack(rs, i + 1, packer)
-      }
+    if(rs == null) {
+      new RowOrientedFrame(Seq.empty, Seq.empty, Array.empty[Byte], Array.empty[Int])
     }
-    packer.close()
+    else {
+      val metadata = rs.getMetaData
+      val numColumns = metadata.getColumnCount
+      val colNames = (1 to numColumns).map(i => metadata.getColumnName(i))
+      val colTypes = (1 to numColumns).map(i => metadata.getColumnType(i))
+      val msgTypes: Seq[MessageType] = colTypes.map(jdbcToMessageType.get(_).getOrElse(MessageType.STRING)).toIndexedSeq
 
-    new RawOrientedFrame(colNames, msgTypes, buf.toByteArray, rowIndexes.result().toArray)
+      val colMapper: Seq[ColMapper] = (colTypes.map { colType =>
+        colType match {
+          case sql.CHAR | sql.VARCHAR | sql.LONGVARCHAR => StringColMapper
+          case sql.NUMERIC | sql.DECIMAL => BigDecimalColMapper
+          case sql.BIT | sql.BOOLEAN => BooleanColMapper
+          case sql.TINYINT => ByteColMapper
+          case sql.SMALLINT => ShortColMapper
+          case sql.INTEGER => IntColMapper
+          case sql.BIGINT => LongColMapper
+          case sql.REAL => FloatColMapper
+          case sql.FLOAT | sql.DOUBLE => DoubleColMapper
+          case sql.BINARY | sql.VARBINARY | sql.LONGVARBINARY => ByteArrayColMapper
+          case sql.DATE => DateColMapper
+          case sql.TIME => TimeColMapper
+          case sql.TIMESTAMP => TimeStampColMapper
+          case sql.CLOB => ByteArrayColMapper
+          case sql.BLOB => ByteArrayColMapper
+          case sql.DATALINK => UrlColMapper
+          case sql.ARRAY => NullColMapper
+          case sql.DISTINCT => NullColMapper
+          case sql.STRUCT => NullColMapper
+          case sql.REF => NullColMapper
+          case sql.JAVA_OBJECT => NullColMapper
+        }
+      }).toIndexedSeq
+
+      val rows = Seq.newBuilder[Any]
+      val buf = new ByteArrayOutputStream()
+      val rowIndexes = Seq.newBuilder[Int]
+
+      withResource(MessagePack.newDefaultPacker(buf)) { packer =>
+        while (rs.next()) {
+          rowIndexes += packer.getTotalWrittenBytes.toInt
+          packer.packArrayHeader(numColumns)
+          for (i <- (0 until numColumns)) {
+            colMapper(i).pack(rs, i + 1, packer)
+          }
+        }
+      }
+      new RowOrientedFrame(colNames, msgTypes, buf.toByteArray, rowIndexes.result().toArray)
+    }
   }
 
   sealed trait MessageType
@@ -208,7 +213,7 @@ trait MsgFrame {
   def numColumns : Int
 }
 
-class RawOrientedFrame(val colNames: Seq[String], val colTypes: Seq[MessageType], val data: Array[Byte], val rowOffsets: Array[Int])
+class RowOrientedFrame(val colNames: Seq[String], val colTypes: Seq[MessageType], val data: Array[Byte], val rowOffsets: Array[Int])
   extends MsgFrame {
 
   def numRows = rowOffsets.length

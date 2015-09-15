@@ -20,4 +20,14 @@ package object core {
 
   def NA : Nothing = throw new UnsupportedOperationException("Not available")
 
+  def withResource[A <: AutoCloseable, U](in:A)(f: A => U) : U = {
+    try {
+      f(in)
+    }
+    finally {
+      if(in != null) {
+        in.close()
+      }
+    }
+  }
 }
