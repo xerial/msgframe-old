@@ -17,10 +17,13 @@ import java.io.ByteArrayOutputStream
 import java.sql.ResultSet
 
 import org.joda.time.DateTime
-import org.msgpack.core.{MessagePack, MessagePacker}
+import org.msgpack.core.buffer.{MessageBufferInput, MessageBuffer}
+import org.msgpack.core.{MessageFormat, MessageUnpacker, MessagePack, MessagePacker}
+import org.msgpack.value.{ValueType, ImmutableValue, Variable, Value}
+import xerial.core.log.Logger
 
 
-object MsgFrame {
+object MsgFrame extends Logger {
 
   import java.sql.{Types => sql}
 
@@ -86,6 +89,7 @@ object MsgFrame {
 
   object TimeStampColMapper extends ColMapper {
     override def pack(rs: ResultSet, colIndex: Int, packer: MessagePacker) = {
+      // TODO use -1 (Timestamp extension type)
       val ts = rs.getTimestamp(colIndex)
       packer.packLong(ts.getTime + (ts.getNanos / 1000000)) // limited accuracy within 1 milliseconds
     }
@@ -133,6 +137,9 @@ object MsgFrame {
           case sql.STRUCT => NullColMapper
           case sql.REF => NullColMapper
           case sql.JAVA_OBJECT => NullColMapper
+          case _ =>
+            warn(s"unknown type: ${colType}")
+            NullColMapper
         }
       }).toIndexedSeq
 
@@ -153,17 +160,84 @@ object MsgFrame {
     }
   }
 
-  sealed trait MessageType
+  sealed trait MessageType {
+    def canReadFrom(valueType:ValueType) : Boolean
+  }
+
 
   object MessageType {
-    object STRING extends MessageType
-    object LONG extends MessageType
-    object DOUBLE extends MessageType
-    object BOOLEAN extends MessageType
-    object BYTE_ARRAY extends MessageType
-    object TIME extends MessageType
-    object TIMESTAMP extends MessageType
-    object UNSUPPORTED extends MessageType
+    object STRING extends MessageType {
+      def canReadFrom(valueType:ValueType) : Boolean = {
+        valueType match {
+          case ValueType.NIL => false
+          case ValueType.BOOLEAN => true
+          case ValueType.INTEGER => true
+          case ValueType.FLOAT => true
+          case ValueType.STRING => true
+          case ValueType.BINARY => true
+          case ValueType.ARRAY => true // as json
+          case ValueType.MAP => true // as json
+          case ValueType.EXTENSION => true // as json
+        }
+      }
+    }
+    object LONG extends MessageType {
+      override def canReadFrom(valueType: ValueType): Boolean = {
+        valueType match {
+          case ValueType.NIL => false
+          case ValueType.BOOLEAN => true
+          case ValueType.INTEGER => true
+          case ValueType.FLOAT => true
+          case ValueType.STRING => true
+          case ValueType.BINARY => false
+          case ValueType.ARRAY => false
+          case ValueType.MAP => false
+          case ValueType.EXTENSION => false
+        }
+      }
+    }
+    object DOUBLE extends MessageType {
+      override def canReadFrom(valueType: ValueType): Boolean = {
+        valueType match {
+          case ValueType.NIL => false
+          case ValueType.BOOLEAN => true
+          case ValueType.INTEGER => true
+          case ValueType.FLOAT => true
+          case ValueType.STRING => true
+          case ValueType.BINARY => false
+          case ValueType.ARRAY => false
+          case ValueType.MAP => false
+          case ValueType.EXTENSION => false
+        }
+      }
+    }
+    object BOOLEAN extends MessageType {
+      override def canReadFrom(valueType: ValueType): Boolean = {
+        valueType match {
+          case ValueType.NIL => false
+          case ValueType.BOOLEAN => true
+          case ValueType.INTEGER => true
+          case ValueType.FLOAT => true
+          case ValueType.STRING => true
+          case ValueType.BINARY => false
+          case ValueType.ARRAY => false
+          case ValueType.MAP => false
+          case ValueType.EXTENSION => false
+        }
+      }
+    }
+    object BYTE_ARRAY extends MessageType {
+      override def canReadFrom(valueType: ValueType): Boolean = ???
+    }
+    object TIME extends MessageType {
+      override def canReadFrom(valueType: ValueType): Boolean = ???
+    }
+    object TIMESTAMP extends MessageType {
+      override def canReadFrom(valueType: ValueType): Boolean = ???
+    }
+    object UNSUPPORTED extends MessageType{
+      override def canReadFrom(valueType: ValueType): Boolean = ???
+    }
   }
 
   import MessageType._
@@ -213,11 +287,73 @@ trait MsgFrame {
   def numColumns : Int
 }
 
-class RowOrientedFrame(val colNames: Seq[String], val colTypes: Seq[MessageType], val data: Array[Byte], val rowOffsets: Array[Int])
+class RowOrientedFrame(val colNames: Seq[String], val colTypes: Seq[MessageType], data: Array[Byte], rowOffsets: Array[Int])
   extends MsgFrame {
+
+
 
   def numRows = rowOffsets.length
   def numColumns = colNames.length
+
+  def colType(col:Int) : MessageType = colTypes(col)
+  def apply(row:Int, col:Int) : Value = ???
+
+
+  private def unpackerAt(row:Int, col:Int): MessageUnpacker = {
+    // TODO avoid creating new unpacker instance by preparing thread-safe unpacker
+    val unpacker = MessagePack.newDefaultUnpacker(data, rowOffsets(row), rowByteArraySize(row))
+    var i = 0
+    while(i < col && unpacker.hasNext) {
+      unpacker.skipValue()
+      i += 1
+    }
+    unpacker
+  }
+
+  private def rowByteArraySize(row:Int) = {
+    val limit = if(row + 1 >= rowOffsets.length) data.length else rowOffsets(row+1)
+    limit - rowOffsets(row)
+  }
+
+  def isNil(row:Int, col:Int, readType:MessageType) = {
+    val unpacker = unpackerAt(row, col)
+    val vt = unpacker.getNextFormat.getValueType
+    !readType.canReadFrom(vt)
+  }
+
+  def readValue(row:Int, col:Int, holder:Variable) : Value = unpackerAt(row, col).unpackValue(holder)
+  def getValue(row:Int, col:Int) : ImmutableValue = unpackerAt(row, col).unpackValue
+  def getLong(row:Int, col:Int) : Long = {
+    val unpacker = unpackerAt(row, col)
+    val mf = unpacker.getNextFormat
+    ???
+  }
+
+  def getString(row:Int, col:Int) : String = {
+    unpackerAt(row, col).unpackString
+  }
+  def getBoolean(row:Int, col:Int) : Boolean = {
+    unpackerAt(row, col).unpackBoolean
+  }
+  def getBytes(row:Int, col:Int) : MessageBuffer = {
+    val unpacker = unpackerAt(row, col)
+    val vt = unpacker.getNextFormat.getValueType
+    vt match {
+      case ValueType.NIL => MessageBuffer.newBuffer(0)
+      case ValueType.BOOLEAN =>
+        val b = unpacker.unpackBoolean()
+        MessageBuffer.wrap(Array[Byte](if(b) 1 else 0))
+      case ValueType.INTEGER => ???
+      case ValueType.FLOAT => ???
+      case ValueType.STRING => ???
+      case ValueType.BINARY => ???
+      case ValueType.ARRAY => ???
+      case ValueType.MAP => ???
+      case ValueType.EXTENSION => ???
+    }
+  }
+  def getTime(row:Int, col:Int) : DateTime = ???
+  def getTimestamp(row:Int, col:Int) : DateTime = ???
 
   override def toString() = {
     val s = new StringBuilder
