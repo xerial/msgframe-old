@@ -1,31 +1,17 @@
-description := "MessagePack based DataFrame for Scala"
+description := "Next-generation table data format"
 
 val commonSettings = Seq(
-  organization := "org.xerial.msgframe",
-  sonatypeProfileName := "org.xerial",
-  scalaVersion := "2.11.7",
-  crossPaths := false
+  organization := "org.msgpack.frame",
+  sonatypeProfileName := "org.msgpack",
+  scalaVersion := "2.11.8"
 )
 
 // Do not publish root project
 publish := {}
 publishLocal := {}
 
-lazy val core = Project(id = "msgframe-core", base = file("msgframe-core"))
-  .settings(commonSettings)
-  .settings(
-    description := "MessagePack based DataFrame for Scala",
-    libraryDependencies ++= Seq(
-      "org.xerial" % "xerial-core" % "3.3.8",
-      "org.msgpack" % "msgpack-core" % "0.7.0-M6",
-      "com.github.nscala-time" %% "nscala-time" % "2.2.0",
-      "org.scalatest" %% "scalatest" % "2.2.4" % "test",
-      "org.xerial" % "sqlite-jdbc" % "3.8.11"
-    )
-)
-
 pomExtra in Global := {
-    <url>http://xerial.org/msgframe</url>
+    <url>https://github.com/xerial/msgframe</url>
     <licenses>
       <license>
         <name>Apache 2</name>
